@@ -1,8 +1,70 @@
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from datetime import date
+from typing import Optional
 
-app = FastAPI()
+from fastapi import FastAPI
+from sqlmodel import Field, Session, SQLModel, create_engine, select
+
+
+# SQLite database for now. We can switch this to PostgreSQL later.
+sqlite_file_name = "task_tracker.db"
+sqlite_url = f"sqlite:///{sqlite_file_name}"
+
+engine = create_engine(
+    sqlite_url,
+    connect_args={"check_same_thread": False}
+)
+
+
+class TaskBase(SQLModel):
+    title: str
+    priority: str = "Medium"
+    due_date: Optional[date] = None
+    completed: bool = False
+
+
+# This is the database table.
+class Task(TaskBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+
+# This is the data FastAPI accepts when creating a task.
+class TaskCreate(TaskBase):
+    pass
+
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/")
 def read_root():
     return {"message": "Task Tracker API is running!"}
+
+
+@app.post("/tasks", response_model=Task)
+def create_task(task: TaskCreate):
+    db_task = Task.model_validate(task)
+
+    with Session(engine) as session:
+        session.add(db_task)
+        session.commit()
+        session.refresh(db_task)
+
+        return db_task
+
+
+@app.get("/tasks", response_model=list[Task])
+def get_tasks():
+    with Session(engine) as session:
+        tasks = session.exec(select(Task)).all()
+        return tasks
