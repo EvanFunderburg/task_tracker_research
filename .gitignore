@@ -1,0 +1,13 @@
+# Python virtual environment
+backend/.venv/
+.venv/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+
+# Environment secrets
+.env
+
+# Node files (for the React frontend later)
+frontend/node_modules/
