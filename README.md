@@ -25,3 +25,13 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 fastapi dev main.py
+```
+
+### Frontend
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open the frontend address shown in the terminal, usually http://localhost:5173.
