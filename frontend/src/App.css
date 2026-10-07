@@ -95,3 +95,9 @@ button:hover {
     flex-direction: column;
   }
 }
+
+.error-message {
+  margin-top: 1rem;
+  color: #b91c1c;
+  font-weight: bold;
+}

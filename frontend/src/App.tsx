@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
 
 type Priority = "Low" | "Medium" | "High";
@@ -7,64 +7,110 @@ type Task = {
   id: number;
   title: string;
   priority: Priority;
-  dueDate: string;
+  due_date: string | null;
   completed: boolean;
 };
 
-const startingTasks: Task[] = [
-  {
-    id: 1,
-    title: "Finish research milestone",
-    priority: "High",
-    dueDate: "2026-10-11",
-    completed: false,
-  },
-  {
-    id: 2,
-    title: "Test FastAPI endpoints",
-    priority: "Medium",
-    dueDate: "",
-    completed: true,
-  },
-];
+const API_URL = "http://127.0.0.1:8000";
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(startingTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [dueDate, setDueDate] = useState("");
+  const [error, setError] = useState("");
 
-  function addTask(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    async function loadTasks() {
+      try {
+        const response = await fetch(`${API_URL}/tasks`);
+
+        if (!response.ok) {
+          throw new Error("Could not load tasks.");
+        }
+
+        const savedTasks = await response.json();
+        setTasks(savedTasks);
+      } catch {
+        setError("Could not connect to the FastAPI server.");
+      }
+    }
+
+    loadTasks();
+  }, []);
+
+  async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!title.trim()) return;
 
-    const newTask: Task = {
-      id: Date.now(),
-      title: title.trim(),
-      priority,
-      dueDate,
-      completed: false,
-    };
+    try {
+      const response = await fetch(`${API_URL}/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          priority,
+          due_date: dueDate || null,
+          completed: false,
+        }),
+      });
 
-    setTasks([...tasks, newTask]);
-    setTitle("");
-    setPriority("Medium");
-    setDueDate("");
+      if (!response.ok) {
+        throw new Error("Could not create task.");
+      }
+
+      const savedTask = await response.json();
+      setTasks([...tasks, savedTask]);
+
+      setTitle("");
+      setPriority("Medium");
+      setDueDate("");
+      setError("");
+    } catch {
+      setError("Could not save the task.");
+    }
   }
 
-  function toggleTask(taskId: number) {
-    setTasks(
-      tasks.map((task) =>
-        task.id === taskId
-          ? { ...task, completed: !task.completed }
-          : task
-      )
-    );
+  async function toggleTask(taskId: number) {
+    try {
+      const response = await fetch(
+        `${API_URL}/tasks/${taskId}/complete`,
+        { method: "PATCH" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not update task.");
+      }
+
+      const updatedTask = await response.json();
+
+      setTasks(
+        tasks.map((task) =>
+          task.id === taskId ? updatedTask : task
+        )
+      );
+    } catch {
+      setError("Could not update the task.");
+    }
   }
 
-  function deleteTask(taskId: number) {
-    setTasks(tasks.filter((task) => task.id !== taskId));
+  async function deleteTask(taskId: number) {
+    try {
+      const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not delete task.");
+      }
+
+      setTasks(tasks.filter((task) => task.id !== taskId));
+    } catch {
+      setError("Could not delete the task.");
+    }
   }
 
   return (
@@ -107,6 +153,8 @@ function App() {
         <button type="submit">Add Task</button>
       </form>
 
+      {error && <p className="error-message">{error}</p>}
+
       <section>
         <h2>Your Tasks</h2>
 
@@ -120,7 +168,7 @@ function App() {
                   <strong>{task.title}</strong>
                   <p>
                     {task.priority} priority
-                    {task.dueDate && ` • Due ${task.dueDate}`}
+                    {task.due_date && ` • Due ${task.due_date}`}
                   </p>
                 </div>
 
